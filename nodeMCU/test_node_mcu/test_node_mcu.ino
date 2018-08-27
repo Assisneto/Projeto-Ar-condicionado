@@ -224,6 +224,14 @@ void authHandler(){
     return;
   }
 
+  //Caso o usuário logado tente acessar a página de login
+  if(isAuth()){
+    server.sendHeader("Location", "/");
+    server.sendHeader("Cache-Control", "no-cache");
+    server.send(301);
+    return;
+  }
+
   //Realiza o login do usuário
   if(server.hasArg("username") && server.hasArg("password")){ //Verifica se tem dados de usuário e senha
     Serial.println("[authHandler] - Tem usuario e senha");
