@@ -201,7 +201,7 @@ void homeHandler(){
   content += (msg != "") ? "<div id='messages'>"+msg+"</div>" : "";
   content += "<table><tr><td>Sala: </td><td colspan='2'>A-211</td></tr><tr><td>Estado: </td>";
   content += (estadoRele == LOW) ? "<td colspan='2' style='color: #1BC295'>On</td>" : "<td colspan='2' style='color: #FF3A37'>Off</td>";
-  content += "</tr><tr><td>Ações: </td><td><a href='/ar=on'><button id='on'>Ligar</button></a></td><td><a href='/ar=off'><button id='off'>Desligar</button></a></td></tr><tr><td>Presença: </td>";
+  content += "</tr><tr><td>Ações: </td><td><a href='/ar?state=on'><button id='on'>Ligar</button></a></td><td><a href='/ar?state=off'><button id='off'>Desligar</button></a></td></tr><tr><td>Presença: </td>";
   content += (sensor == 1) ? "<td colspan='2'>Com presença</td>" : "<td colspan='2'>Sem presença</td>";
   content += "</tr></table><a href='/auth?logout=true'><button id='logout'>Sair</button></a></div></body></html>";
   server.send(200, "text/html", content);
@@ -269,21 +269,37 @@ void authHandler(){
  * Controla o ar-condicionado
  */
 void arHandler(){
-  if(server.hasArg("ar")){
-    if(server.arg("ar") == "on"){ // Recebimento da requisição do botão (Ligar).
+  Serial.println("[arHandler] - Entrou");
+
+  if(server.hasArg("state")){
+    Serial.println("[arHandler] - Tem o argumento state");
+
+    if(server.arg("state") == "on"){ // Recebimento da requisição do botão (Ligar).
+      Serial.println("[arHandler] - Tem o argumento state=on");
+
       digitalWrite(pinRele, LOW); // Ligamento do aparelho.
       estadoRele = LOW; // Variável auxiliar para mudar o estado On/Off na página Web.
       tempo = 0; // Variável tempo zerada, mesma função de quando o sensor está detectando presença.
+      server.sendHeader("Location", "/");
+      server.sendHeader("Cache-Control", "no-cache");
+      server.send(301);
     }
 
-    if(server.arg("ar") == "off"){ // Recebimento da requisição do botão (Desligar).
+    if(server.arg("state") == "off"){ // Recebimento da requisição do botão (Desligar).
+      Serial.println("[arHandler] - Tem o argumento state=off");
+
       digitalWrite(pinRele, HIGH); // Desligamento do aparelho.
       estadoRele = HIGH; // Variável auxiliar para mudar o estado On/Off na página Web.
       tempo = 300; // Após a requisição (Desligar), Impossibilitar que o sensor altere o estado do sistema durante 30 segundos. Assumindo este valor, será levado a condição de "pausa".
+      server.sendHeader("Location", "/");
+      server.sendHeader("Cache-Control", "no-cache");
+      server.send(301);
     }
 
     //Caso tente desligar um ar-condicionado que tem presença na sala
-    if(server.arg("ar") == "off" && sensor == 1){
+    if(server.arg("state") == "off" && sensor == 1){
+      Serial.println("[arHandler] - Tentou desligar um aparelho com presença na sala");
+
       server.sendHeader("Location", "/op=deny");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
