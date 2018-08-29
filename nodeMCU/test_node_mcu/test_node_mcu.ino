@@ -277,9 +277,13 @@ void arHandler(){
     if(server.arg("state") == "on"){ // Recebimento da requisição do botão (Ligar).
       Serial.println("[arHandler] - Tem o argumento state=on");
 
-      digitalWrite(pinRele, LOW); // Ligamento do aparelho.
-      estadoRele = LOW; // Variável auxiliar para mudar o estado On/Off na página Web.
-      tempo = 0; // Variável tempo zerada, mesma função de quando o sensor está detectando presença.
+      if(isAuth()){
+        Serial.println("[arHandler] - Ligou aparelho");
+        digitalWrite(pinRele, LOW); // Ligamento do aparelho.
+        estadoRele = LOW; // Variável auxiliar para mudar o estado On/Off na página Web.
+        tempo = 0; // Variável tempo zerada, mesma função de quando o sensor está detectando presença.
+      }
+
       server.sendHeader("Location", "/");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
@@ -288,9 +292,13 @@ void arHandler(){
     if(server.arg("state") == "off"){ // Recebimento da requisição do botão (Desligar).
       Serial.println("[arHandler] - Tem o argumento state=off");
 
-      digitalWrite(pinRele, HIGH); // Desligamento do aparelho.
-      estadoRele = HIGH; // Variável auxiliar para mudar o estado On/Off na página Web.
-      tempo = 300; // Após a requisição (Desligar), Impossibilitar que o sensor altere o estado do sistema durante 30 segundos. Assumindo este valor, será levado a condição de "pausa".
+      if(isAuth()){
+        Serial.println("[arHandler] - Desligou aparelho");
+        digitalWrite(pinRele, HIGH); // Desligamento do aparelho.
+        estadoRele = HIGH; // Variável auxiliar para mudar o estado On/Off na página Web.
+        tempo = 300; // Após a requisição (Desligar), Impossibilitar que o sensor altere o estado do sistema durante 30 segundos. Assumindo este valor, será levado a condição de "pausa".
+      }
+
       server.sendHeader("Location", "/");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
@@ -300,7 +308,7 @@ void arHandler(){
     if(server.arg("state") == "off" && sensor == 1){
       Serial.println("[arHandler] - Tentou desligar um aparelho com presença na sala");
 
-      server.sendHeader("Location", "/op=deny");
+      server.sendHeader("Location", (isAuth()) ? "/op=deny" : "/");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
     }
