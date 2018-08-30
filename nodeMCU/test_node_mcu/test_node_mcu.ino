@@ -64,7 +64,7 @@ void setup() {
 
   // Conectando a rede WiFi
   WiFi.config(ip, gateway, subnet);
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA); // Configurar NodeMCU como estação
   WiFi.begin(ssid, password);
 
   // Caso haja perca de conexão, conectar-se novamente.
@@ -75,7 +75,7 @@ void setup() {
   /*
    * Método "on" da classe ESP8266WebServer
    * Esse método registra uma URL e o que será feito quando
-   * essa url for acessada. A assisnatura do método é a seguinte:
+   * essa url for acessada. A assinatura do método é a seguinte:
    * on(string URL, HTTPMethod metodo, Handler)
    * URL -> URL do sistema que será controlada
    * metodo -> Método HTTP que será usada para acessar a URL. (É um ENUM da classe ESP8266WebServer)
@@ -91,9 +91,9 @@ void setup() {
    * Configurações do servidor
    * Necessárias para fazer funcionar a autenticação
    */
-  const char * headerkeys[] = {"Cookie"};
-  size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
-  server.collectHeaders(headerkeys, headerkeyssize);
+  const char * headerkeys[] = {"Cookie"}; // Nome do cabeçalho que será coletado a cada requisição
+  size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*); // Memoria a ser alocada.
+  server.collectHeaders(headerkeys, headerkeyssize); // Coleta dos cookies
 
   // Iniciando o servidor.
   server.begin();
@@ -170,7 +170,7 @@ bool isAuth(){
   Serial.println("[isAuth] - Entrou");
   if (server.hasHeader("Cookie")) { //Verifica a existência de cookies
     Serial.println("[isAuth] - Tem o header Cookie");
-    String cookie = server.header("Cookie");
+    String cookie = server.header("Cookie"); //Pega o valor do cabeçalho HTTP Cookie
     if (cookie.indexOf("ESPSESSIONID=1") != -1) { //Verifica se existe o cookie de usuário autenticado
       Serial.println("[isAuth] - Tem o cookie de sessao");
       return true;
@@ -218,7 +218,7 @@ void homeHandler(){
   content += "</tr><tr><td>Ações: </td><td><a href='/ar?state=on'><button id='on'>Ligar</button></a></td><td><a href='/ar?state=off'><button id='off'>Desligar</button></a></td></tr><tr><td>Presença: </td>";
   content += (sensor == 1) ? "<td colspan='2'>Com presença</td>" : "<td colspan='2'>Sem presença</td>";
   content += "</tr></table><a href='/auth?logout=true'><button id='logout'>Sair</button></a></div></body></html>";
-  server.send(200, "text/html", content); //Aqui é enviado ao cliente o código HTTP 200, que significa OK, o conteudo da resposta, e o conteudo da resposta  
+  server.send(200, "text/html", content); //Aqui é enviado ao cliente o código HTTP 200, que significa OK, o tipo da resposta, e o conteudo da resposta  
 }
 
 /*
@@ -305,28 +305,28 @@ void arHandler(){
       server.sendHeader("Location", "/");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
+      return;
     }
 
     if(server.arg("state") == "off"){ // Recebimento da requisição do botão (Desligar).
       Serial.println("[arHandler] - Tem o argumento state=off");
 
       if(isAuth()){
-        Serial.println("[arHandler] - Desligou aparelho");
-        digitalWrite(pinRele, HIGH); // Desligamento do aparelho.
-        estadoRele = HIGH; // Variável auxiliar para mudar o estado On/Off na página Web.
-        tempo = 300; // Após a requisição (Desligar), Impossibilitar que o sensor altere o estado do sistema durante 30 segundos. Assumindo este valor, será levado a condição de "pausa".
+        if(sensor != 1){
+          Serial.println("[arHandler] - Desligou aparelho");
+          digitalWrite(pinRele, HIGH); // Desligamento do aparelho.
+          estadoRele = HIGH; // Variável auxiliar para mudar o estado On/Off na página Web.
+          tempo = 300; // Após a requisição (Desligar), Impossibilitar que o sensor altere o estado do sistema durante 30 segundos. Assumindo este valor, será levado a condição de "pausa".
+        } else {
+          Serial.println("[arHandler] - Tentou desligar um aparelho com presença na sala");
+          server.sendHeader("Location", "/op=deny");
+          server.sendHeader("Cache-Control", "no-cache");
+          server.send(301);
+          return;
+        }
       }
 
       server.sendHeader("Location", "/");
-      server.sendHeader("Cache-Control", "no-cache");
-      server.send(301);
-    }
-
-    //Caso tente desligar um ar-condicionado que tem presença na sala
-    if(server.arg("state") == "off" && sensor == 1){
-      Serial.println("[arHandler] - Tentou desligar um aparelho com presença na sala");
-
-      server.sendHeader("Location", (isAuth()) ? "/op=deny" : "/");
       server.sendHeader("Cache-Control", "no-cache");
       server.send(301);
     }
