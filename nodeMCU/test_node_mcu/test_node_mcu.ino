@@ -50,7 +50,7 @@ ESP8266WebServer server(80);
 
 void setup() {
 
-  Serial.begin(115200);
+  Serial.begin(115200); //Iniciando comunicação serial para debug
 
   os_timer_setfn(&tmr0, contagem, NULL); //Indica ao Timer qual sera sua Sub rotina.
   os_timer_arm(&tmr0, 1000, true); // Contagem a cada 1 segundo.
@@ -73,13 +73,19 @@ void setup() {
   }
 
   /*
-   * Rotas do servidor
+   * Método "on" da classe ESP8266WebServer
+   * Esse método registra uma URL e o que será feito quando
+   * essa url for acessada. A assisnatura do método é a seguinte:
+   * on(string URL, HTTPMethod metodo, Handler)
+   * URL -> URL do sistema que será controlada
+   * metodo -> Método HTTP que será usada para acessar a URL. (É um ENUM da classe ESP8266WebServer)
+   * handler -> Função que será executada quando a URL for acessada.
    */
   server.on("/", HTTP_GET, homeHandler);        //Rota inicial, primeira página a ser acessada pelo usuário
   server.on("/auth", HTTP_GET, authHandler);    //Rota que realiza e controla a autenticação do usuário
   server.on("/login", HTTP_POST, authHandler);  //Rota que processa os dados de login do usuário
   server.on("/ar", HTTP_GET, arHandler);        //Rota que faz o controle do ar-condicionado
-  server.onNotFound(notFoundHandler);           //Função para controlar o que acontece quando é acessado uma página inexistente
+  server.onNotFound(notFoundHandler);           //Esse método indica qual função será executada quando uma URL não registrada for acessada
 
   /*
    * Configurações do servidor
@@ -96,7 +102,8 @@ void setup() {
 
 void loop() {
   
-  server.handleClient(); //Fica esperando um requisição
+
+  server.handleClient(); //Método do servidor que fica aguardando requisições.
 
   sensor = digitalRead(pinSensor); // Leitura do sinal recebido pelo Sensor de Presença PIR
 
@@ -152,9 +159,12 @@ void contagem(void*z)
 }
 
 /*
- * isAuth
+ * isAuth()
  * Verifica se o usuário está logado, se estiver
  * retorna true, se não retorna false
+ * 
+ * .hasHeader() -> Método da classe ESP8266WebServer que verifica a existência de um cabeçalho HTTP na requisição atual.
+ * .header() -> Método da classe ESP8266WebServer que retorna um cabeçalho HTTP.
  */
 bool isAuth(){
   Serial.println("[isAuth] - Entrou");
@@ -172,17 +182,21 @@ bool isAuth(){
 
 /*
  * homeHandler
- * Função que gerencia a rota '/'
+ * Essa função é executada quando é acessada a URL '/'.
+ * A função verifica se o usuário está autenticado, se não estiver
+ * o usuário simplesmente é redirecionado para o login, através de cabeçalhos HTTP.
+ * 
+ * sendHeader(cabeçalho, valor)
  */
 void homeHandler(){
   String msg = "";
   Serial.println("[homeHandler] - Entrou");
   if (!isAuth()){ //verifica se o usuário está logado, se não estiver redireciona para o login
     Serial.println("[homeHandler] - Nao ta logado");
-    server.sendHeader("Location", "/auth");
-    server.sendHeader("Cache-Control", "no-cache");
-    server.send(301);
-    return;
+    server.sendHeader("Location", "/auth"); // envio do cabeçalho que indica redirecionamento.
+    server.sendHeader("Cache-Control", "no-cache"); // cabeçalho para indicar para não fazer cache
+    server.send(301); //envio do código HTTP que indica redirecionamento permanente
+    return; //para a execução da função.
   }
 
   /*
@@ -193,7 +207,7 @@ void homeHandler(){
     msg = "Sala Ocupada ! Operação não permitida.";
   }
 
-  //Se estiver logado, é exibida a página de gerenciamento do ar condicionado
+  // Se o usuário estiver logado, será mostrado a tela de controle do aparelho.
   Serial.println("[homeHandler] - Exibe o conteudo da pagina");
   String content = "<!DOCTYPE html><html lang='pt-br'><head><meta charset='UTF-8'><meta http-equiv='refresh' content='3'><title>Controle e Monitoramento</title>";
   content += "<style type='text/css'>*{margin: 0;padding: 0;}body{font-family: Arial;background-color: #333;color: #fff;}#wrap{width: 960px;margin: 0 auto;text-align: center;font-size: 20px;font-weight: bold;}p#title{font-size: 25px;font-weight: bold;margin-top: 10%;margin-bottom: 2.5%;}#wrap table{margin: 0 auto;text-align: left;border-spacing: 0;border: none;font-weight: normal;}#wrap td{border-bottom: 1px solid #7f8c8d;padding: 10px;}#wrap tr:hover td{border-color: #fff;}tr td:first-child{font-weight: bold;}td button{font-size: 16px;padding: 6px;border: none;border-radius: 4px;color: #fff;cursor: pointer;outline: none;}button#on{background-color: #1BC295;}button#on:hover{background-color: #169C77;}button#off{background-color: #FF3A37;}button#off:hover{background-color: #CF312F;}#messages{width: fit-content;margin: 0 auto;margin-bottom: 2.5%;border: 1px solid #FF3A37;padding: 7px;font-weight: normal;border-radius: 3px;text-align: center;color: #FF3A37;}#logout{width: 150px;margin-top: 15px;font-size: 16px;padding: 6px;border: none;background-color: #e67e22;color: #fff;border-radius: 50px;cursor: pointer;}#logout:hover{background-color: #ED5E00;}</style>";
@@ -204,12 +218,16 @@ void homeHandler(){
   content += "</tr><tr><td>Ações: </td><td><a href='/ar?state=on'><button id='on'>Ligar</button></a></td><td><a href='/ar?state=off'><button id='off'>Desligar</button></a></td></tr><tr><td>Presença: </td>";
   content += (sensor == 1) ? "<td colspan='2'>Com presença</td>" : "<td colspan='2'>Sem presença</td>";
   content += "</tr></table><a href='/auth?logout=true'><button id='logout'>Sair</button></a></div></body></html>";
-  server.send(200, "text/html", content);
+  server.send(200, "text/html", content); //Aqui é enviado ao cliente o código HTTP 200, que significa OK, o conteudo da resposta, e o conteudo da resposta  
 }
 
 /*
  * authHandler
  * Função responsavel por gerenciar toda a autenticação do sistema
+ * -Realiza o logout do usuário(setando o cookie de autenticação como 0, para indicar que não está logado)
+ * -Previne que o usuário já autenticado acesse a página de login
+ * -Realiza o login do usuário
+ * -Exibe a página de login
  */
 void authHandler(){
   Serial.println("[authHandler] - Entrou");
