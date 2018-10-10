@@ -32,15 +32,10 @@ os_timer_t tmr0;//Cria o Timer.
 unsigned long int tempo; //Variável de controle "Timer".
 unsigned long int *z; //Variável auxiliar de controle do "Timer".
 
-
-os_timer_t tmr1;//Cria o Timer.
-
 unsigned long int timerEstado;
 unsigned long int timerPresenca;
 unsigned long int timerReconnect;
-unsigned long int *y; //Variável auxiliar de controle do "Timer".
 
- 
 const char* ssid = "ZE MARIA"; // Nome da Rede Wifi.
 const char* password = "09121944"; // Senha da Rede Wifi.
 
@@ -64,15 +59,13 @@ void setup() {
   os_timer_setfn(&tmr0, contagem, NULL); //Indica ao Timer qual sera sua Sub rotina.
   os_timer_arm(&tmr0, 1000, true); // Contagem a cada 1 segundo.
 
-  os_timer_setfn(&tmr1, timer, NULL); //Indica ao Timer qual sera sua Sub rotina.
-  os_timer_arm(&tmr1, 1000, true); // Contagem a cada 1 segundo.
-
   // Declaração de que o relé será usado como saída.
   pinMode(pinRele, OUTPUT);
 
   // Declaração de que o sensor será usado como entrada.
   pinMode(pinSensor,INPUT);
 
+  estadoRele = LOW;
 
   // Conectando a rede WiFi.
   WiFi.config(ip, gateway, subnet);
@@ -120,8 +113,7 @@ void loop() {
         timerReconnect = 0;
       }
     }
-  } else {
-
+  } else { 
     // Cliente conectado.
     client.loop();
   }
@@ -154,36 +146,18 @@ void loop() {
   //Desliga.
   if(sensor == 0){ // Sem presença no local.
 
-    if(timerPresenca > 1) {
+    if(timerPresenca > 0) {
         client.publish("nodemcu/ar/presence", "0"); // Publicação a cada 2 segundos.
         timerPresenca = 0;
     }
-    if ( tempo > 0 && tempo < 300){ // Intervalo de tempo no qual apesar do sensor estiver captando zero, o aparelho continuará com o estado ligado.
-      estadoRele = HIGH;
-      if(timerEstado > 1) {
-        client.publish("nodemcu/ar/state", "ligado"); // Publicação a cada 2 segundos.
-        Serial.println("Sensor = 0; manter ligado");
-        timerEstado = 0;
-      }
-    }
-
+    
     // Quando chegar aos 5 minutos sem presença, desligar o aparelho e impossibilitar o sensor de interferir no sistema por 1:30 minutos.        
-    if(tempo > 299 && tempo < 391){ 
+    if(tempo > 299 && tempo < 303){ 
       digitalWrite(pinRele, LOW); // Desligamento do aparelho.
       estadoRele = LOW; // Variável auxiliar para mudar o estado On/Off na página Web.
       if(timerEstado > 1) {
         client.publish("nodemcu/ar/state", "desligou"); // Publicação a cada 2 segundos.
         Serial.println("Sensor = 0; tempo esgotado, desligou");
-        timerEstado = 0;
-      }
-    }
-    
-    if(tempo > 390){ // Após o tempo de descanso de 1:30 minutos do aparelho, se sensor captar zero, o estado permanece desligado e continuará a contagem do tempo.
-      digitalWrite(pinRele, LOW); // Desligamento do aparelho.
-      estadoRele = LOW; // Variável auxiliar para mudar o estado On/Off na página Web.
-      if(timerEstado > 1) {
-        client.publish("nodemcu/ar/state", "desligou"); // Publicação a cada 2 segundos.
-        Serial.println("Sensor = 0; após 5min sem presenca continua desligado");
         timerEstado = 0;
       }
     }
@@ -203,24 +177,27 @@ void contagem(void*z)
     
     tempo = 391; // Valor escolhido para que não caia na condição de "intervalo" entre tempo 5:00 minutos e 6:30 minutos.
   }
- 
-   tempo++;
-
-}
-
-/*
- * Sub rotina ISR do Timer1 sera acessada a cada 1 Segundo.
- */
-void timer(void*y)
-{
   // Caso a variável chegue ao seu tamanho máximo, o valor será 3 novamente.
   if(timerReconnect == 4294967290){
 
     timerReconnect = 3; // Valor definido para que mesmo que não consiga se reconectar, não saia da condição de tentativa.
   }
+  // Caso a variável chegue ao seu tamanho máximo, o valor será 3 novamente.
+  if(timerEstado == 4294967290){
+
+    timerEstado = 3;
+  }
+  // Caso a variável chegue ao seu tamanho máximo, o valor será 3 novamente.
+  if(timerPresenca == 4294967290){
+    
+    timerPresenca = 3;
+  }
+ 
+  tempo++;
   timerEstado++;
   timerPresenca++;
   timerReconnect++;
+
 }
 
 /*
@@ -418,3 +395,4 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length){
       Serial.println("Comando invalido");
     }
 }
+
